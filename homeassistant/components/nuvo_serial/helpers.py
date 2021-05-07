@@ -12,7 +12,6 @@ from .const import CONF_SOURCES, CONF_ZONES
 
 @callback
 def get_sources_from_dict(data: MappingProxyType[str, Any]) -> list[Any]:
-    # def get_sources_from_dict(data: dict[str, Any]) -> list[dict[str, Any], dict[str, Any], list[str] ]:
     """Munge Sources."""
     sources_config = data[CONF_SOURCES]
 

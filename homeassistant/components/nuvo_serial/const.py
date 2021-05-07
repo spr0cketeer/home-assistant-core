@@ -4,6 +4,8 @@ DOMAIN = "nuvo_serial"
 
 CONF_ZONES = "zones"
 CONF_SOURCES = "sources"
+ZONE = "zone"
+SOURCE = "source"
 
 CONF_SOURCE_1 = "source_1"
 CONF_SOURCE_2 = "source_2"
@@ -14,6 +16,12 @@ CONF_SOURCE_6 = "source_6"
 
 CONF_VOLUME_STEP = "volume_step"
 CONF_NOT_FIRST_RUN = "not_first_run"
+
+CONTROL_EQ_BASS = "bass"
+CONTROL_EQ_TREBLE = "treble"
+CONTROL_EQ_BALANCE = "balance"
+CONTROL_EQ_LOUDCMP = "loudcmp"
+CONTROL_SOURCE_GAIN = "gain"
 
 SERVICE_SNAPSHOT = "snapshot"
 SERVICE_RESTORE = "restore"
