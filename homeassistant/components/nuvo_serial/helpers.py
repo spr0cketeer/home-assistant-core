@@ -1,5 +1,8 @@
 """Helper utils for interfacing with Nuvo multi-zone amplifier."""
-from typing import Dict
+from __future__ import annotations
+
+from types import MappingProxyType
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import callback
@@ -8,7 +11,8 @@ from .const import CONF_SOURCES, CONF_ZONES
 
 
 @callback
-def get_sources_from_dict(data):
+def get_sources_from_dict(data: MappingProxyType[str, Any]) -> list[Any]:
+    # def get_sources_from_dict(data: dict[str, Any]) -> list[dict[str, Any], dict[str, Any], list[str] ]:
     """Munge Sources."""
     sources_config = data[CONF_SOURCES]
 
@@ -22,7 +26,7 @@ def get_sources_from_dict(data):
 
 
 @callback
-def get_sources(config_entry):
+def get_sources(config_entry: ConfigEntry) -> list[Any]:
     """Get the Nuvo Sources."""
     if CONF_SOURCES in config_entry.options:
         data = config_entry.options
@@ -32,12 +36,12 @@ def get_sources(config_entry):
 
 
 @callback
-def get_zones(config_entry: ConfigEntry) -> Dict[str, str]:
+def get_zones(config_entry: ConfigEntry) -> dict[str, str]:
     """Get the Nuvo Zones."""
     if CONF_ZONES in config_entry.options:
         data = config_entry.options
     else:
         data = config_entry.data
 
-    zone: Dict[str, str] = data[CONF_ZONES]
+    zone: dict[str, str] = data[CONF_ZONES]
     return zone
