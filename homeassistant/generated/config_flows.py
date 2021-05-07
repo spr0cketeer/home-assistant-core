@@ -174,6 +174,7 @@ FLOWS = [
     "nuheat",
     "nuki",
     "nut",
+    "nuvo_serial",
     "nws",
     "nzbget",
     "omnilogic",
