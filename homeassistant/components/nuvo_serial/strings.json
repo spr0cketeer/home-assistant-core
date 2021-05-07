@@ -30,7 +30,7 @@
   },
   "options": {
     "step": {
-      "init": {
+      "sources": {
         "title": "Configure sources",
         "data": {
           "source_1": "Name of source #1",
@@ -39,6 +39,12 @@
           "source_4": "Name of source #4",
           "source_5": "Name of source #5",
           "source_6": "Name of source #6"
+        }
+      },
+      "port": {
+        "title": "Serial Port device (change requires restart)",
+        "data": {
+          "port": "[%key:common::config_flow::data::port%]"
         }
       }
     }

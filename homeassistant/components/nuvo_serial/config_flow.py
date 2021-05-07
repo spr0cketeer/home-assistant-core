@@ -15,6 +15,7 @@ from .const import DOMAIN  # pylint:disable=unused-import
 _LOGGER = logging.getLogger(__name__)
 
 DATA_SCHEMA = vol.Schema({vol.Required(CONF_PORT): str, vol.Required(CONF_TYPE): str})
+# PORT_SCHEMA = vol.Schema({vol.Required(CONF_PORT): str})
 
 
 @core.callback
@@ -121,7 +122,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _create_entry(self):
         """Create device and entities."""
-        return self.async_create_entry(title=self._data[CONF_PORT], data=self._data)
+        title = " ".join(self._data[CONF_TYPE].split("_"))
+        return self.async_create_entry(title=title, data=self._data)
 
     @core.callback
     def _get_source_schema(self, sources):
@@ -193,24 +195,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return nuvo
 
 
-# @core.callback
-# def _key_for_source(index, source, previous_sources):
-#     if str(index) in previous_sources:
-#         key = vol.Optional(
-#             source, description={"suggested_value": previous_sources[str(index)]}
-#         )
-#     else:
-#         key = vol.Optional(source)
-
-#     return key
-
-
 class NuvoOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle a Nuvo options flow."""
 
     def __init__(self, config_entry):
         """Initialize."""
         self.config_entry = config_entry
+        self._data = {}
+        self._port_changed = False
 
     @core.callback
     def _previous_sources(self):
@@ -224,16 +216,34 @@ class NuvoOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         """Manage the options."""
+        return await self.async_step_port()
+
+    async def async_step_port(self, user_input=None):
+        """Handle serial port change."""
+        current_port = self.config_entry.data[CONF_PORT]
+        errors = {}
         if user_input is not None:
-            return self.async_create_entry(
-                title="", data={CONF_SOURCES: _idx_from_config(user_input)}
-            )
+            _LOGGER.debug(user_input[CONF_PORT])
+            if user_input[CONF_PORT] != current_port:
+                self._port_changed = True
+            self._data[CONF_PORT] = user_input[CONF_PORT]
+            return await self.async_step_sources()
 
+        schema = vol.Schema({vol.Required(CONF_PORT, default=current_port): str})
+        return self.async_show_form(step_id="port", data_schema=schema, errors=errors)
+
+    async def async_step_sources(self, user_input=None):
+        """Handle Source changes."""
+        if user_input is not None:
+            _LOGGER.debug("in aync_step_source abt to async_create_entry")
+            _LOGGER.debug(self._data[CONF_PORT])
+            self._data[CONF_SOURCES] = _idx_from_config(user_input)
+            return self.async_create_entry(title="", data=self._data)
+
+        # return await self.async_step_port()
         previous_sources = self._previous_sources()
-
         source_schema = _get_source_schema(previous_sources)
-
-        return self.async_show_form(step_id="init", data_schema=source_schema)
+        return self.async_show_form(step_id="sources", data_schema=source_schema)
 
     # async def _get_nuvo_sources(self):
     #     model = self.config_entry.data[CONF_TYPE]

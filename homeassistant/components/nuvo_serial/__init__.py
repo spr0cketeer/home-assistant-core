@@ -30,7 +30,8 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up Nuvo multi-zone amplifier from a config entry."""
-    port = entry.data[CONF_PORT]
+    # port = entry.data[CONF_PORT]
+    port = entry.options.get(CONF_PORT, entry.data[CONF_PORT])
     model = entry.data[CONF_TYPE]
 
     try:
@@ -38,6 +39,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     except SerialException as err:
         _LOGGER.error("Error connecting to Nuvo controller at %s", port)
         raise ConfigEntryNotReady from err
+
+    # hass.async_create_task(
+    #     hass.config_entries.flow.async_init(
+    #         DOMAIN,
+    #         context={"source": SOURCE_REAUTH},
+    #         data=entry.data,
+    #     )
+    # )
 
     # double negative to handle absence of value
     first_run = not bool(entry.data.get(CONF_NOT_FIRST_RUN))
