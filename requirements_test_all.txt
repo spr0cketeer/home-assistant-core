@@ -574,6 +574,9 @@ numato-gpio==0.10.0
 # homeassistant.components.trend
 numpy==1.20.3
 
+# homeassistant.components.nuvo_serial
+nuvo-serial==0.1.0
+
 # homeassistant.components.google
 oauth2client==4.0.0
 
