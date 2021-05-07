@@ -7,8 +7,8 @@ from nuvo_serial.grand_concerto_essentia_g import NuvoAsync
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_TYPE
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import DOMAIN, NUVO_OBJECT
 from .helpers import get_zones
@@ -17,7 +17,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
+    hass: HomeAssistantType,
     config_entry: ConfigEntry,
     async_add_entities: Callable[[Iterable[Entity], bool], None],
 ) -> None:

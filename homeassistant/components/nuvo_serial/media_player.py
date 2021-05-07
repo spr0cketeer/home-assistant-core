@@ -24,9 +24,9 @@ from homeassistant.components.media_player.const import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID, CONF_TYPE, STATE_OFF, STATE_ON
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_platform
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import (
     CONF_VOLUME_STEP,
@@ -50,7 +50,7 @@ SUPPORT_NUVO_SERIAL = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
+    hass: HomeAssistantType,
     config_entry: ConfigEntry,
     async_add_entities: Callable[[Iterable[Entity], bool], None],
 ) -> None:
