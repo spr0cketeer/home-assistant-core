@@ -1,3 +1,7 @@
+all_off:
+  name: All Off
+  description: Switch off all zones.
+
 page_on:
   name: Page On
   description: Activate Paging feature for all zones.

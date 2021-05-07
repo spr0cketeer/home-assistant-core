@@ -12,6 +12,7 @@ from homeassistant.helpers.typing import ConfigType, HomeAssistantType, ServiceC
 from .const import (
     DOMAIN,
     NUVO_OBJECT,
+    SERVICE_ALL_OFF,
     SERVICE_PAGE_OFF,
     SERVICE_PAGE_ON,
     UNDO_UPDATE_LISTENER,
@@ -59,9 +60,15 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
         """Service call to turn paging off."""
         await nuvo.set_page(False)
 
+    async def all_off(call: ServiceCallType) -> None:
+        """Service call to turn all zones off."""
+        await nuvo.all_off()
+
     hass.services.async_register(DOMAIN, SERVICE_PAGE_ON, page_on, schema=None)
 
     hass.services.async_register(DOMAIN, SERVICE_PAGE_OFF, page_off, schema=None)
+
+    hass.services.async_register(DOMAIN, SERVICE_ALL_OFF, all_off, schema=None)
 
     return True
 
