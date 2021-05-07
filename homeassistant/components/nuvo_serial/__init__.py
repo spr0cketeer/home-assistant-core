@@ -18,7 +18,7 @@ from .const import (
     UNDO_UPDATE_LISTENER,
 )
 
-PLATFORMS = ["media_player"]
+PLATFORMS = ["media_player", "number"]
 
 _LOGGER = logging.getLogger(__name__)
 
