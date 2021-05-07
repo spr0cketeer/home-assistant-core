@@ -7,8 +7,8 @@ from serial import SerialException
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PORT, CONF_TYPE
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.typing import ConfigType, HomeAssistantType, ServiceCallType
 
 from .const import (
     CONF_NOT_FIRST_RUN,
@@ -25,12 +25,12 @@ PLATFORMS = ["media_player", "number", "switch"]
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup(hass: HomeAssistant, config: dict):
+async def async_setup(hass: HomeAssistantType, config: ConfigType) -> bool:
     """Set up the Nuvo multi-zone amplifier component."""
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
     """Set up Nuvo multi-zone amplifier from a config entry."""
     # port = entry.data[CONF_PORT]
     port = entry.options.get(CONF_PORT, entry.data[CONF_PORT])
@@ -63,11 +63,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             hass.config_entries.async_forward_entry_setup(entry, component)
         )
 
-    async def page_on(call) -> None:
+    async def page_on(call: ServiceCallType) -> None:
         """Service call to turn paging on."""
+        import ipdb
+
+        ipdb.set_trace()
         await nuvo.set_page(True)
 
-    async def page_off(call) -> None:
+    async def page_off(call: ServiceCallType) -> None:
         """Service call to turn paging off."""
         await nuvo.set_page(False)
 
@@ -78,7 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_unload_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = all(
         await asyncio.gather(
@@ -99,6 +102,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     return unload_ok
 
 
-async def _update_listener(hass: HomeAssistant, entry: ConfigEntry):
+async def _update_listener(hass: HomeAssistantType, entry: ConfigEntry) -> None:
     """Handle options update."""
     await hass.config_entries.async_reload(entry.entry_id)
