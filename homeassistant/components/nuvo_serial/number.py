@@ -112,7 +112,7 @@ class Bass(NumberEntity):
 
     @property
     def name(self):
-        """Return the name of the bass number."""
+        """Return the name of the control."""
         return self._name
 
 
@@ -182,7 +182,7 @@ class Treble(NumberEntity):
 
     @property
     def name(self):
-        """Return the name of the bass number."""
+        """Return the name of the control."""
         return self._name
 
 
@@ -266,5 +266,5 @@ class Balance(NumberEntity):
 
     @property
     def name(self):
-        """Return the name of the bass number."""
+        """Return the name of the control."""
         return self._name
