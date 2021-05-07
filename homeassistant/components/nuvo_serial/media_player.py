@@ -3,6 +3,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 import logging
 
 from nuvo_serial.const import ranges
+from serial import SerialException
 
 from homeassistant import core
 from homeassistant.components.media_player import MediaPlayerEntity
@@ -27,9 +28,6 @@ from .const import (
     SERVICE_RESTORE,
     SERVICE_SNAPSHOT,
 )
-
-# from serial import SerialException
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -185,33 +183,27 @@ class NuvoZone(MediaPlayerEntity):
 
     def update(self):
         """Retrieve latest state."""
-        state = self._nuvo.zone_status(self._zone_id)
 
-        if not state:
-            _LOGGER.error("NO STATE RETURNED")
-            return False
+        try:
+            z_status = self._nuvo.zone_status(self._zone_id)
+            z_cfg = self._nuvo.zone_configuration(self._zone_id)
+        except (SerialException, ValueError) as e:
+            _LOGGER.error(
+                "Zone %d %s Update failed: %s",
+                self._zone_id,
+                self.entity_id,
+                e,
+            )
+            return
 
-        if not state.power:
-            self._state = STATE_OFF
-            return True
+        self._process_zone_status(z_status)
 
-        self._state = STATE_ON
-        self._mute = state.mute
-
-        if not self._mute:
-            self._volume = self.nuvo_to_hass_vol(state.volume)
-
-        self._source = self._source_id_name.get(state.source, None)
+        self._source = self._source_id_name.get(z_status.source, None)
 
         """
         Update zone's permitted sources.
         A permitted source may not appear in the list of system-wide enabled sources.
         """
-        z_cfg = self._nuvo.zone_configuration(self._zone_id)
-        if not z_cfg:
-            _LOGGER.error("NO ZONE CONFIGURATION RETURNED")
-            return False
-
         self._source_names = list(
             filter(
                 None,
@@ -222,7 +214,16 @@ class NuvoZone(MediaPlayerEntity):
             )
         )
 
-        return True
+    def _process_zone_status(self, z_status):
+        if not z_status.power:
+            self._state = STATE_OFF
+            return True
+
+        self._state = STATE_ON
+        self._mute = z_status.mute
+
+        if not self._mute:
+            self._volume = self.nuvo_to_hass_vol(z_status.volume)
 
     @property
     def device_info(self):
