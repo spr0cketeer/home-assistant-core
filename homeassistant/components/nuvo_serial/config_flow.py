@@ -85,6 +85,9 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            if self._port_already_in_use(user_input[CONF_PORT]):
+                raise AbortFlow("port_in_use")
+
             try:
                 self._nuvo = await get_nuvo_async(
                     user_input[CONF_PORT], models[user_input[CONF_TYPE]]
@@ -107,6 +110,19 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user", data_schema=DATA_SCHEMA, errors=errors
         )
+
+    @callback
+    def _port_already_in_use(self, port: str) -> bool:
+        """Check the port is not already in use."""
+
+        in_use = False
+
+        for existing_nuvo in self.hass.config_entries.async_entries(DOMAIN):
+            if existing_nuvo.data.get(CONF_PORT, "") == port:
+                in_use = True
+                break
+
+        return in_use
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None

@@ -50,6 +50,7 @@
       "model": "Incompatible model found",
       "sources": "Unable to retrieve Source list",
       "zones": "Unable to retrieve Zone list",
+      "port_in_use": "This Port is already in use",
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
   },
@@ -67,7 +68,7 @@
         }
       },
       "port": {
-        "title": "Serial Port device (change requires restart)",
+        "title": "Serial Port(change requires restart)",
         "data": {
           "port": "[%key:common::config_flow::data::port%]"
         }
