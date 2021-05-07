@@ -1,6 +1,8 @@
 """Support for interfacing with Nuvo multi-zone amplifier."""
+from __future__ import annotations
+
 import logging
-from typing import Any, Callable, Dict, Iterable
+from typing import Any, Callable, Iterable, dict
 
 from nuvo_serial.grand_concerto_essentia_g import NuvoAsync
 
@@ -76,7 +78,7 @@ class LoudnessCompensation(SwitchEntity):
         await self._nuvo.set_loudness_comp(self._zone_id, not (self.value))
 
     @property
-    def device_info(self) -> Dict[str, Any]:
+    def device_info(self) -> dict[str, Any]:
         """Return device info for this device."""
         return {
             "identifiers": {(DOMAIN, self._namespace)},
@@ -96,7 +98,7 @@ class LoudnessCompensation(SwitchEntity):
         return self._name
 
     @property
-    def device_state_attributes(self) -> Dict[str, int]:
+    def device_state_attributes(self) -> dict[str, int]:
         """Return the name of the control."""
         return {"zone_id": self._zone_id}
 
@@ -122,7 +124,7 @@ class LoudnessCompensation(SwitchEntity):
         self._nuvo.remove_subscriber(self._update_callback, "ZoneEQStatus")
         self._nuvo = None
 
-    async def _update_callback(self, message: Dict[str, Any]) -> None:
+    async def _update_callback(self, message: dict[str, Any]) -> None:
         """Update entity state callback.
 
         Nuvo lib calls this when it receives new messages.
