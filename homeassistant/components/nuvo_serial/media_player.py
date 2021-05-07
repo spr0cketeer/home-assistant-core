@@ -41,11 +41,6 @@ SUPPORT_NUVO_SERIAL = (
     | SUPPORT_SELECT_SOURCE
 )
 
-ATTR_LOUDNESS_COMPENSATION = "loudness_compensation"
-ATTR_BASS_LEVEL = "bass_level"
-ATTR_BASS_LEVEL_NATIVE = "bass_level_native"
-ATTR_TREBLE_LEVEL = "treble_level"
-
 LEVELS = {
     "Grand_Concerto": {
         "volume": {"max": 0, "min": 79, "step": 1},
@@ -178,12 +173,6 @@ class NuvoZone(MediaPlayerEntity):
         self._source = None
         self._mute = None
 
-        self._bass = None
-        self._bass_native = None
-        self._treble = None
-        self._loudness_compensation = None
-        self._balance = None
-
     def update(self):
         """Retrieve latest state."""
         state = self._nuvo.zone_status(self._zone_id)
@@ -222,17 +211,6 @@ class NuvoZone(MediaPlayerEntity):
                 ],
             )
         )
-
-        eq = self._nuvo.zone_eq_status(self._zone_id)
-        if not eq:
-            _LOGGER.error("NO EQ STATE RETURNED")
-            return False
-
-        self._bass = self.nuvo_to_hass_eq("bass", eq.bass)
-        self._bass_native = eq.bass
-        self._treble = self.nuvo_to_hass_eq("treble", eq.treble)
-        self._treble_native = eq.treble
-        self._loudness_compensation = eq.loudcmp
 
         return True
 
@@ -290,26 +268,6 @@ class NuvoZone(MediaPlayerEntity):
     def source_list(self):
         """List of available input sources."""
         return self._source_names
-
-    # @property
-    # def bass_level(self):
-    #     """Bass level of the media player (0..1)."""
-    #     return self._bass
-
-    # @property
-    # def loudness_compensation(self):
-    #     """Boolean if loudness compensation is enabled."""
-    #     return self._loudness_compensation
-
-    @property
-    def device_state_attributes(self):
-        """Return device specific state attributes."""
-        attributes = {}
-        attributes[ATTR_LOUDNESS_COMPENSATION] = self._loudness_compensation
-        attributes[ATTR_BASS_LEVEL] = self._bass
-        attributes[ATTR_BASS_LEVEL_NATIVE] = self._bass_native
-        attributes[ATTR_TREBLE_LEVEL] = self._treble
-        return attributes
 
     def snapshot(self):
         """Save zone's current state."""
@@ -413,38 +371,3 @@ class NuvoZone(MediaPlayerEntity):
     def page_off(self):
         """Turn Page Off."""
         self._nuvo.set_page_off()
-
-    def eq_request(self):
-        """Request a zone's EQ status."""
-        return self._nuvo.request_eq(self._zone_id)
-
-    def set_bass(self, bass, native_scale):
-        """Set a zone's bass level."""
-        if native_scale:
-            return self._nuvo.set_bass(self._zone_id, bass)
-        else:
-            return self._nuvo.set_bass(
-                self._zone_id, self.hass_to_nuvo_eq("bass", bass)
-            )
-
-    def set_treble(self, treble):
-        """Set a zone's treble level."""
-        return self._nuvo.set_treble(
-            self._zone_id, self.hass_to_nuvo_eq("treble", treble)
-        )
-
-    def set_loudness_comp(self, loudness_comp):
-        """Set a zone's loudness compensation."""
-        _LOGGER.info(
-            f"Loudness_comp = {loudness_comp} {type(loudness_comp)} {bool(loudness_comp)}"
-        )
-        return self._nuvo.set_loudness_comp(self._zone_id, bool(loudness_comp))
-
-    def toggle_loudness_comp(self):
-        """Toggle a zone's loudness compensation."""
-        _LOGGER.info(
-            f"Toggling loudness compensation for zone {self._zone_id} from {self._loudness_compensation} to {not self._loudness_compensation}"
-        )
-        return self._nuvo.set_loudness_comp(
-            self._zone_id, not self._loudness_compensation
-        )
