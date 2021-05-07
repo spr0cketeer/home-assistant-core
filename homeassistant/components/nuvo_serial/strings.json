@@ -73,6 +73,16 @@
           "port": "[%key:common::config_flow::data::port%]"
         }
       }
+    },
+    "error": {
+      "port": "Invalid port",
+      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]"
+    },
+    "abort": {
+      "port_in_use": "This Port is already in use",
+      "model": "Incompatible model found",
+      "sources": "Unable to retrieve Source list",
+      "zones": "Unable to retrieve Zone list"
     }
   }
 }

@@ -20,6 +20,7 @@ from homeassistant.config_entries import (
 from homeassistant.const import CONF_PORT, CONF_TYPE
 from homeassistant.core import callback
 from homeassistant.data_entry_flow import AbortFlow
+from homeassistant.helpers.typing import HomeAssistantType
 
 from .const import CONF_SOURCES, CONF_ZONES, DOMAIN
 
@@ -64,6 +65,24 @@ def _get_source_schema(
     return data_schema
 
 
+@callback
+def _port_already_in_use(
+    hass: HomeAssistantType, port: str, exclude_id: str = None
+) -> bool:
+    """Check the port is not already in use."""
+
+    in_use = False
+
+    for existing_nuvo in hass.config_entries.async_entries(DOMAIN):
+        if exclude_id and existing_nuvo.entry_id == exclude_id:
+            next
+        if existing_nuvo.data.get(CONF_PORT, "") == port:
+            in_use = True
+            break
+
+    return in_use
+
+
 class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Nuvo Amplifier."""
 
@@ -85,7 +104,7 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            if self._port_already_in_use(user_input[CONF_PORT]):
+            if _port_already_in_use(self.hass, user_input[CONF_PORT]):
                 raise AbortFlow("port_in_use")
 
             try:
@@ -259,16 +278,43 @@ class NuvoOptionsFlowHandler(OptionsFlow):
         """Handle serial port change."""
 
         current_port = self.config_entry.data[CONF_PORT]
+        form_port = current_port
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            _LOGGER.debug(user_input[CONF_PORT])
-            if user_input[CONF_PORT] != current_port:
-                self._port_changed = True
-            self._data[CONF_PORT] = user_input[CONF_PORT]
-            return await self.async_step_sources()
+            errors = {}
+            _port = user_input[CONF_PORT]
 
-        schema = vol.Schema({vol.Required(CONF_PORT, default=current_port): str})
+            if _port != current_port:
+                # Check this is a valid port with a Nuvo on it
+                form_port = _port
+
+                if _port_already_in_use(self.hass, _port):
+                    raise AbortFlow("port_in_use")
+                try:
+                    self._nuvo = await get_nuvo_async(
+                        _port, self.config_entry.data[CONF_TYPE]
+                    )
+                except SerialException:
+                    _LOGGER.exception("")
+                    errors[CONF_PORT] = "port"
+                except ModelMismatchError:
+                    _LOGGER.exception("")
+                    raise AbortFlow("model")
+                except Exception:
+                    _LOGGER.exception("")
+                    errors["base"] = "cannot_connect"
+                else:
+                    self._port_changed = True
+                    # Disconnect here to free the serial port as a connect will happen
+                    # in integration setup
+                    await self._nuvo.disconnect()
+
+            if not errors:
+                self._data[CONF_PORT] = _port
+                return await self.async_step_sources()
+
+        schema = vol.Schema({vol.Required(CONF_PORT, default=form_port): str})
         return self.async_show_form(step_id="port", data_schema=schema, errors=errors)
 
     async def async_step_sources(
@@ -276,8 +322,6 @@ class NuvoOptionsFlowHandler(OptionsFlow):
     ) -> dict[str, Any]:
         """Handle Source changes."""
         if user_input is not None:
-            _LOGGER.debug("in aync_step_source abt to async_create_entry")
-            _LOGGER.debug(self._data[CONF_PORT])
             self._data[CONF_SOURCES] = _idx_from_config(user_input)
             return self.async_create_entry(title="", data=self._data)
 
