@@ -65,9 +65,6 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
 
     async def page_on(call: ServiceCallType) -> None:
         """Service call to turn paging on."""
-        import ipdb
-
-        ipdb.set_trace()
         await nuvo.set_page(True)
 
     async def page_off(call: ServiceCallType) -> None:
