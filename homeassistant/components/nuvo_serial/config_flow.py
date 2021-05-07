@@ -224,7 +224,7 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
         source_count = config[self._data[CONF_TYPE]]["sources"]["total"]
         sources = []
         for source_num in range(1, source_count + 1):
-            source = await self._nuvo.source_status(source_num)
+            source = await self._nuvo.source_configuration(source_num)
             if source.enabled:
                 sources.append(source)
 

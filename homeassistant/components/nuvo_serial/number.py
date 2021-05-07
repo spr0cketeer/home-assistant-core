@@ -191,7 +191,7 @@ class GainControl(NuvoControl, NuvoNumberControl):
 
     async def _nuvo_get_control_value(self) -> None:
         """Get value."""
-        await self._nuvo.source_status(self._nuvo_id)
+        await self._nuvo.source_configuration(self._nuvo_id)
 
     async def _nuvo_set_control_value(self, value: float) -> None:
         """Set new value."""
