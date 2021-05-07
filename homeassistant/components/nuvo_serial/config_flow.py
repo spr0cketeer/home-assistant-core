@@ -6,11 +6,8 @@ from typing import Any
 
 from nuvo_serial import get_nuvo_async
 from nuvo_serial.const import ranges
-from nuvo_serial.grand_concerto_essentia_g import (
-    NuvoAsync,
-    SourceConfiguration,
-    ZoneConfiguration,
-)
+from nuvo_serial.exceptions import ModelMismatchError
+from nuvo_serial.grand_concerto_essentia_g import SourceConfiguration, ZoneConfiguration
 from serial import SerialException
 import voluptuous as vol
 
@@ -22,15 +19,16 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_PORT, CONF_TYPE
 from homeassistant.core import callback
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.data_entry_flow import AbortFlow
 
-from .const import CONF_SOURCES, CONF_ZONES
-from .const import DOMAIN  # pylint:disable=unused-import
+from .const import CONF_SOURCES, CONF_ZONES, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-DATA_SCHEMA = vol.Schema({vol.Required(CONF_PORT): str, vol.Required(CONF_TYPE): str})
-# PORT_SCHEMA = vol.Schema({vol.Required(CONF_PORT): str})
+models = {" ".join(model.split("_")): model for model in ranges.keys()}
+DATA_SCHEMA = vol.Schema(
+    {vol.Required(CONF_PORT): str, vol.Required(CONF_TYPE): vol.In(models.keys())}
+)
 
 
 @callback
@@ -88,16 +86,23 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                self._nuvo = await self._async_get_nuvo(user_input)
-            except CannotConnect:
+                self._nuvo = await get_nuvo_async(
+                    user_input[CONF_PORT], models[user_input[CONF_TYPE]]
+                )
+            except SerialException:
+                _LOGGER.exception("")
+                errors[CONF_PORT] = "port"
+            except ModelMismatchError:
+                _LOGGER.exception("")
+                raise AbortFlow("model")
+            except Exception:
+                _LOGGER.exception("")
                 errors["base"] = "cannot_connect"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
+            else:
 
-            self._data[CONF_PORT] = user_input[CONF_PORT]
-            self._data[CONF_TYPE] = user_input[CONF_TYPE]
-            return await self.async_step_sources()
+                self._data[CONF_PORT] = user_input[CONF_PORT]
+                self._data[CONF_TYPE] = models[user_input[CONF_TYPE]]
+                return await self.async_step_sources()
 
         return self.async_show_form(
             step_id="user", data_schema=DATA_SCHEMA, errors=errors
@@ -123,9 +128,11 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             sources = await self._get_nuvo_sources()
-        except SerialException as err:
-            _LOGGER.error("Error retrieving zone data from Nuvo controller")
-            raise CannotConnect from err
+        except Exception:
+            _LOGGER.exception("")
+            await self._async_nuvo_disconnect()
+            raise AbortFlow("sources")
+
         source_schema = _get_source_schema(sources)
         return self.async_show_form(
             step_id="sources",
@@ -145,7 +152,13 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
             self._data[CONF_ZONES] = _idx_from_config(user_input)
             return await self._create_entry()
 
-        zones = await self._get_nuvo_zones()
+        try:
+            zones = await self._get_nuvo_zones()
+        except Exception:
+            _LOGGER.exception("")
+            await self._async_nuvo_disconnect()
+            raise AbortFlow("zones")
+
         zone_schema = self._get_zone_schema(zones)
         return self.async_show_form(
             step_id="zones",
@@ -155,21 +168,10 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _create_entry(self) -> dict[str, Any]:
         """Create device and entities."""
-        await self._nuvo.disconnect()
+        await self._async_nuvo_disconnect()
         self._nuvo = None
         title = " ".join(self._data[CONF_TYPE].split("_"))
         return self.async_create_entry(title=title, data=self._data)
-
-    # @callback
-    # def _get_source_schema(self, sources):
-    #     """Create schema for source validation."""
-    #     data_schema = vol.Schema(
-    #         {
-    #             vol.Optional(f"source_{source.source}", default=source.name): str
-    #             for source in sources
-    #         }
-    #     )
-    #     return data_schema
 
     @callback
     def _get_zone_schema(self, zones: list[ZoneConfiguration]) -> vol.Schema:
@@ -186,14 +188,10 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
         """Retrieve enabled sources from Nuvo."""
         source_count = ranges[self._data[CONF_TYPE]]["sources"]
         sources = []
-        try:
-            for source_num in range(1, source_count + 1):
-                source = await self._nuvo.source_status(source_num)
-                if source.enabled:
-                    sources.append(source)
-        except SerialException as err:
-            _LOGGER.error("Error retrieving source data from Nuvo controller")
-            raise CannotConnect from err
+        for source_num in range(1, source_count + 1):
+            source = await self._nuvo.source_status(source_num)
+            if source.enabled:
+                sources.append(source)
 
         return sources
 
@@ -201,26 +199,16 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
         """Retrieve enabled zones from Nuvo."""
         zone_count = ranges[self._data[CONF_TYPE]]["zones"]["physical"]
         zones = []
-        try:
-            for zone_num in range(1, zone_count + 1):
-                zone = await self._nuvo.zone_configuration(zone_num)
-                if zone.enabled:
-                    zones.append(zone)
-        except SerialException as err:
-            _LOGGER.error("Error retrieving source data from Nuvo controller")
-            raise CannotConnect from err
+        for zone_num in range(1, zone_count + 1):
+            zone = await self._nuvo.zone_configuration(zone_num)
+            if zone.enabled:
+                zones.append(zone)
 
         return zones
 
-    async def _async_get_nuvo(self, data: dict[str, str]) -> NuvoAsync:
-        """: dict[str, str]Connect to the amplifier and return the handler."""
-        try:
-            nuvo = await get_nuvo_async(data[CONF_PORT], data[CONF_TYPE])
-        except SerialException as err:
-            _LOGGER.error("Error connecting to Nuvo controller")
-            raise CannotConnect from err
-
-        return nuvo
+    async def _async_nuvo_disconnect(self):
+        """Disconnect from the amplifier."""
+        await self._nuvo.disconnect()
 
 
 class NuvoOptionsFlowHandler(OptionsFlow):
@@ -277,29 +265,6 @@ class NuvoOptionsFlowHandler(OptionsFlow):
             self._data[CONF_SOURCES] = _idx_from_config(user_input)
             return self.async_create_entry(title="", data=self._data)
 
-        # return await self.async_step_port()
         previous_sources = self._previous_sources()
         source_schema = _get_source_schema(previous_sources)
         return self.async_show_form(step_id="sources", data_schema=source_schema)
-
-    # async def _get_nuvo_sources(self):
-    #     model = self.config_entry.data[CONF_TYPE]
-    #     nuvo = self.hass.data[DOMAIN][self.config_entry.entry_id][NUVO_OBJECT]
-    #     source_count = ranges[model]["sources"]
-    #     sources = []
-    #     try:
-    #         for source_num in range(1, source_count + 1):
-    #             source = await self.hass.async_add_executor_job(
-    #                 nuvo.source_status, source_num
-    #             )
-    #             if source.enabled:
-    #                 sources.append(source)
-    #     except SerialException as err:
-    #         _LOGGER.error("Error retrieving source data from Nuvo controller")
-    #         raise CannotConnect from err
-
-    #     return sources
-
-
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
