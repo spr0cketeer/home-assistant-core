@@ -38,6 +38,12 @@ class NuvoControl:
         self._name = f"{self._nuvo_entity_name} {self._control_name.capitalize()}"
         self._unique_id = f"{self._namespace}_{self._nuvo_entity_type}_{self._nuvo_id}_{self._control_name}"  # noqa: E501
         self._control_value: float = 0
+        self._available: bool = False
+
+    @property
+    def available(self) -> bool:
+        """Return is the media_player is available."""
+        return self._available
 
     @property
     def device_info(self) -> dict[str, Any]:
@@ -99,6 +105,7 @@ class NuvoControl:
             self._control_value = float(getattr(msg, self._control_name))
             if self._control_name == "balance" and msg.balance_position == "L":
                 self._control_value = -self._control_value
+            self._available = True
         except (KeyError, AttributeError):
             _LOGGER.debug(
                 "%s %d %s: invalid %s message received",

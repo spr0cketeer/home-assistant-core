@@ -126,7 +126,7 @@ class NuvoZone(MediaPlayerEntity):
         self._min_volume = min_volume
 
         self._snapshot = None
-        self._state: str | None = None
+        self._state: str = ""
         self._volume: float
         self._source: str
         self._mute: bool
@@ -139,7 +139,7 @@ class NuvoZone(MediaPlayerEntity):
     @property
     def available(self) -> bool:
         """Return is the media_player is available."""
-        return self._state is not None
+        return bool(self._state)
 
     @property
     def device_info(self) -> dict[str, Any]:
