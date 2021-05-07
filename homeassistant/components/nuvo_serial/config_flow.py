@@ -1,7 +1,7 @@
 """Config flow for Nuvo multi-zone amplifier integration."""
 import logging
 
-from nuvo_serial import get_nuvo
+from nuvo_serial import get_nuvo_async
 from nuvo_serial.const import ranges
 from serial import SerialException
 import voluptuous as vol
@@ -153,9 +153,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         sources = []
         try:
             for source_num in range(1, source_count + 1):
-                source = await self.hass.async_add_executor_job(
-                    self._nuvo.source_status, source_num
-                )
+                source = await self._nuvo.source_status(source_num)
                 if source.enabled:
                     sources.append(source)
         except SerialException as err:
@@ -170,9 +168,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         zones = []
         try:
             for zone_num in range(1, zone_count + 1):
-                zone = await self.hass.async_add_executor_job(
-                    self._nuvo.zone_configuration, zone_num
-                )
+                zone = await self._nuvo.zone_configuration(zone_num)
                 if zone.enabled:
                     zones.append(zone)
         except SerialException as err:
@@ -184,10 +180,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _async_get_nuvo(self, data):
         """Connect to the amplifier and return the handler."""
         try:
-            nuvo = await self.hass.async_add_executor_job(
-                get_nuvo, data[CONF_PORT], data[CONF_TYPE]
-            )
-
+            nuvo = await get_nuvo_async(data[CONF_PORT], data[CONF_TYPE])
         except SerialException as err:
             _LOGGER.error("Error connecting to Nuvo controller")
             raise CannotConnect from err

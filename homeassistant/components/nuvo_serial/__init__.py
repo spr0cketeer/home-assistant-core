@@ -2,7 +2,7 @@
 import asyncio
 import logging
 
-from nuvo_serial import get_nuvo
+from nuvo_serial import get_nuvo_async
 from serial import SerialException
 
 from homeassistant.config_entries import ConfigEntry
@@ -18,7 +18,8 @@ from .const import (
     UNDO_UPDATE_LISTENER,
 )
 
-PLATFORMS = ["media_player", "number", "switch"]
+PLATFORMS = ["media_player"]
+# PLATFORMS = ["media_player", "number", "switch"]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +36,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     model = entry.data[CONF_TYPE]
 
     try:
-        nuvo = await hass.async_add_executor_job(get_nuvo, port, model)
+        nuvo = await get_nuvo_async(port, model)
+        # nuvo = await hass.async_add_executor_job(get_nuvo, port, model)
     except SerialException as err:
         _LOGGER.error("Error connecting to Nuvo controller at %s", port)
         raise ConfigEntryNotReady from err
