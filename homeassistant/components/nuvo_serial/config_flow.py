@@ -1,13 +1,28 @@
 """Config flow for Nuvo multi-zone amplifier integration."""
+from __future__ import annotations
+
 import logging
+from typing import Any
 
 from nuvo_serial import get_nuvo_async
 from nuvo_serial.const import ranges
+from nuvo_serial.grand_concerto_essentia_g import (
+    NuvoAsync,
+    SourceConfiguration,
+    ZoneConfiguration,
+)
 from serial import SerialException
 import voluptuous as vol
 
-from homeassistant import config_entries, core, exceptions
+from homeassistant.config_entries import (
+    CONN_CLASS_LOCAL_POLL,
+    ConfigEntry,
+    ConfigFlow,
+    OptionsFlow,
+)
 from homeassistant.const import CONF_PORT, CONF_TYPE
+from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import CONF_SOURCES, CONF_ZONES
 from .const import DOMAIN  # pylint:disable=unused-import
@@ -18,8 +33,9 @@ DATA_SCHEMA = vol.Schema({vol.Required(CONF_PORT): str, vol.Required(CONF_TYPE):
 # PORT_SCHEMA = vol.Schema({vol.Required(CONF_PORT): str})
 
 
-@core.callback
-def _idx_from_config(data):
+@callback
+def _idx_from_config(data: dict[str, str]) -> dict[int, str]:
+    """Cleanse input from user."""
     modded = {}
 
     for k, v in data.items():
@@ -28,8 +44,11 @@ def _idx_from_config(data):
     return modded
 
 
-@core.callback
-def _get_source_schema(sources):
+@callback
+def _get_source_schema(
+    sources: dict[str, str] | list[SourceConfiguration]
+) -> vol.Schema:
+    """Create schema for source validation."""
     if isinstance(sources, dict):
         data_schema = vol.Schema(
             {
@@ -47,22 +66,26 @@ def _get_source_schema(sources):
     return data_schema
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Nuvo Amplifier."""
 
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
+    CONNECTION_CLASS = CONN_CLASS_LOCAL_POLL
 
     @staticmethod
-    @core.callback
-    def async_get_options_flow(config_entry):
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> NuvoOptionsFlowHandler:
         """Define the config flow to handle options."""
         return NuvoOptionsFlowHandler(config_entry)
 
-    async def async_step_init(self, user_input=None):
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Handle the initial step."""
-        self._data = {}
-        errors = {}
+
+        self._data: dict[str, Any] = {}
+        errors: dict[str, str] = {}
+
         if user_input is not None:
             try:
                 self._nuvo = await self._async_get_nuvo(user_input)
@@ -80,13 +103,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user", data_schema=DATA_SCHEMA, errors=errors
         )
 
-    async def async_step_user(self, user_input=None):
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Handle the initial step."""
         return await self.async_step_init(user_input)
 
-    async def async_step_sources(self, user_input=None):
+    async def async_step_sources(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Handle Nuvo sources."""
-        errors = {}
+
+        errors: dict[str, str] = {}
+
         if user_input is not None:
             """process sources"""
             self._data[CONF_SOURCES] = _idx_from_config(user_input)
@@ -97,16 +126,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         except SerialException as err:
             _LOGGER.error("Error retrieving zone data from Nuvo controller")
             raise CannotConnect from err
-        source_schema = self._get_source_schema(sources)
+        source_schema = _get_source_schema(sources)
         return self.async_show_form(
             step_id="sources",
             data_schema=source_schema,
             errors=errors,
         )
 
-    async def async_step_zones(self, user_input=None):
+    async def async_step_zones(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Handle Nuvo zones."""
-        errors = {}
+
+        errors: dict[str, str] = {}
+
         if user_input is not None:
             """process zones"""
             self._data[CONF_ZONES] = _idx_from_config(user_input)
@@ -120,26 +153,26 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _create_entry(self):
+    async def _create_entry(self) -> dict[str, Any]:
         """Create device and entities."""
         await self._nuvo.disconnect()
         self._nuvo = None
         title = " ".join(self._data[CONF_TYPE].split("_"))
         return self.async_create_entry(title=title, data=self._data)
 
-    @core.callback
-    def _get_source_schema(self, sources):
-        """Create schema for source validation."""
-        data_schema = vol.Schema(
-            {
-                vol.Optional(f"source_{source.source}", default=source.name): str
-                for source in sources
-            }
-        )
-        return data_schema
+    # @callback
+    # def _get_source_schema(self, sources):
+    #     """Create schema for source validation."""
+    #     data_schema = vol.Schema(
+    #         {
+    #             vol.Optional(f"source_{source.source}", default=source.name): str
+    #             for source in sources
+    #         }
+    #     )
+    #     return data_schema
 
-    @core.callback
-    def _get_zone_schema(self, zones):
+    @callback
+    def _get_zone_schema(self, zones: list[ZoneConfiguration]) -> vol.Schema:
         """Create schema for zone validation."""
         data_schema = vol.Schema(
             {
@@ -149,7 +182,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return data_schema
 
-    async def _get_nuvo_sources(self):
+    async def _get_nuvo_sources(self) -> list[SourceConfiguration]:
         """Retrieve enabled sources from Nuvo."""
         source_count = ranges[self._data[CONF_TYPE]]["sources"]
         sources = []
@@ -164,7 +197,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return sources
 
-    async def _get_nuvo_zones(self):
+    async def _get_nuvo_zones(self) -> list[ZoneConfiguration]:
         """Retrieve enabled zones from Nuvo."""
         zone_count = ranges[self._data[CONF_TYPE]]["zones"]["physical"]
         zones = []
@@ -179,8 +212,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return zones
 
-    async def _async_get_nuvo(self, data):
-        """Connect to the amplifier and return the handler."""
+    async def _async_get_nuvo(self, data: dict[str, str]) -> NuvoAsync:
+        """: dict[str, str]Connect to the amplifier and return the handler."""
         try:
             nuvo = await get_nuvo_async(data[CONF_PORT], data[CONF_TYPE])
         except SerialException as err:
@@ -190,18 +223,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return nuvo
 
 
-class NuvoOptionsFlowHandler(config_entries.OptionsFlow):
+class NuvoOptionsFlowHandler(OptionsFlow):
     """Handle a Nuvo options flow."""
 
-    def __init__(self, config_entry):
+    def __init__(self, config_entry: ConfigEntry):
         """Initialize."""
         self.config_entry = config_entry
-        self._data = {}
+        self._data: dict[str, Any] = {}
         self._port_changed = False
 
-    @core.callback
-    def _previous_sources(self):
+    @callback
+    def _previous_sources(self) -> dict[str, str]:
         """Get current sources."""
+        previous: dict[str, str]
         if CONF_SOURCES in self.config_entry.options:
             previous = self.config_entry.options[CONF_SOURCES]
         else:
@@ -209,14 +243,20 @@ class NuvoOptionsFlowHandler(config_entries.OptionsFlow):
 
         return previous
 
-    async def async_step_init(self, user_input=None):
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Manage the options."""
         return await self.async_step_port()
 
-    async def async_step_port(self, user_input=None):
+    async def async_step_port(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Handle serial port change."""
+
         current_port = self.config_entry.data[CONF_PORT]
-        errors = {}
+        errors: dict[str, str] = {}
+
         if user_input is not None:
             _LOGGER.debug(user_input[CONF_PORT])
             if user_input[CONF_PORT] != current_port:
@@ -227,7 +267,9 @@ class NuvoOptionsFlowHandler(config_entries.OptionsFlow):
         schema = vol.Schema({vol.Required(CONF_PORT, default=current_port): str})
         return self.async_show_form(step_id="port", data_schema=schema, errors=errors)
 
-    async def async_step_sources(self, user_input=None):
+    async def async_step_sources(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Handle Source changes."""
         if user_input is not None:
             _LOGGER.debug("in aync_step_source abt to async_create_entry")
@@ -259,5 +301,5 @@ class NuvoOptionsFlowHandler(config_entries.OptionsFlow):
     #     return sources
 
 
-class CannotConnect(exceptions.HomeAssistantError):
+class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""
