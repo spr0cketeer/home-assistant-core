@@ -5,9 +5,11 @@ from decimal import ROUND_HALF_EVEN, Decimal
 import logging
 from typing import Any, Callable, Iterable
 
-from nuvo_serial.const import ranges
+from nuvo_serial.configuration import config
+from nuvo_serial.const import ZONE_BUTTON, ZONE_CONFIGURATION, ZONE_STATUS
 from nuvo_serial.grand_concerto_essentia_g import (
     NuvoAsync,
+    ZoneButton,
     ZoneConfiguration,
     ZoneStatus,
 )
@@ -31,8 +33,13 @@ from homeassistant.helpers.typing import HomeAssistantType
 from .const import (
     CONF_VOLUME_STEP,
     DOMAIN,
+    DOMAIN_EVENT,
+    KEYPAD_BUTTON_TO_EVENT,
     NUVO_OBJECT,
     SERVICE_RESTORE,
+    SERVICE_SIMULATE_NEXT,
+    SERVICE_SIMULATE_PLAY_PAUSE,
+    SERVICE_SIMULATE_PREV,
     SERVICE_SNAPSHOT,
 )
 from .helpers import get_sources, get_zones
@@ -62,8 +69,8 @@ async def async_setup_entry(
     sources = get_sources(config_entry)
     zones = get_zones(config_entry)
     volume_step = config_entry.data.get(CONF_VOLUME_STEP, 1)
-    max_volume = ranges[model]["volume"]["max"]
-    min_volume = ranges[model]["volume"]["min"]
+    max_volume = config[model]["volume"]["max"]
+    min_volume = config[model]["volume"]["min"]
     entities = []
 
     for zone_id, zone_name in zones.items():
@@ -90,6 +97,15 @@ async def async_setup_entry(
 
     platform.async_register_entity_service(SERVICE_SNAPSHOT, SERVICE_SCHEMA, "snapshot")  # type: ignore
     platform.async_register_entity_service(SERVICE_RESTORE, SERVICE_SCHEMA, "restore")  # type: ignore
+    platform.async_register_entity_service(
+        SERVICE_SIMULATE_PLAY_PAUSE, SERVICE_SCHEMA, "simulate_play_pause_button"
+    )
+    platform.async_register_entity_service(
+        SERVICE_SIMULATE_PREV, SERVICE_SCHEMA, "simulate_prev_button"
+    )
+    platform.async_register_entity_service(
+        SERVICE_SIMULATE_NEXT, SERVICE_SCHEMA, "simulate_next_button"
+    )
 
 
 class NuvoZone(MediaPlayerEntity):
@@ -202,8 +218,9 @@ class NuvoZone(MediaPlayerEntity):
         Subscribe callback to handle updates from the Nuvo.
         Request initial entity state, letting the update callback handle setting it.
         """
-        self._nuvo.add_subscriber(self._update_callback, "ZoneStatus")
-        self._nuvo.add_subscriber(self._update_callback, "ZoneConfiguration")
+        self._nuvo.add_subscriber(self._update_callback, ZONE_STATUS)
+        self._nuvo.add_subscriber(self._update_callback, ZONE_CONFIGURATION)
+        self._nuvo.add_subscriber(self._zone_button_callback, ZONE_BUTTON)
         await self._nuvo.zone_status(self._zone_id)
         await self._nuvo.zone_configuration(self._zone_id)
 
@@ -212,8 +229,9 @@ class NuvoZone(MediaPlayerEntity):
 
         Remove Nuvo update callback.
         """
-        self._nuvo.remove_subscriber(self._update_callback, "ZoneStatus")
-        self._nuvo.remove_subscriber(self._update_callback, "ZoneConfiguration")
+        self._nuvo.remove_subscriber(self._update_callback, ZONE_STATUS)
+        self._nuvo.remove_subscriber(self._update_callback, ZONE_CONFIGURATION)
+        self._nuvo.remove_subscriber(self._zone_button_callback, ZONE_BUTTON)
         self._nuvo = None
 
     async def _update_callback(self, message: ZoneConfiguration | ZoneStatus) -> None:
@@ -231,14 +249,29 @@ class NuvoZone(MediaPlayerEntity):
             message,
         )
 
-        if event_name == "ZoneConfiguration":
+        if event_name == ZONE_CONFIGURATION:
             self._process_zone_configuration(d_class)
-        elif event_name == "ZoneStatus":
+        elif event_name == ZONE_STATUS:
             self._process_zone_status(d_class)
         else:
             return
 
         self.async_schedule_update_ha_state()
+
+    async def _zone_button_callback(self, message: ZoneButton) -> None:
+        """Fire event when a zone keypad 'PLAYPAUSE', 'PREV' or 'NEXT' button is pressed."""
+
+        if message["event"].zone != self._zone_id:
+            return
+
+        _LOGGER.debug("Firing ZoneButton event: %s", message)
+        self.hass.bus.async_fire(
+            DOMAIN_EVENT,
+            {
+                "type": KEYPAD_BUTTON_TO_EVENT[message["event"].button],
+                ATTR_ENTITY_ID: self.entity_id,
+            },
+        )
 
     def _process_zone_status(self, z_status: ZoneStatus) -> None:
         """Update zone's power, volume and source state.
@@ -298,8 +331,7 @@ class NuvoZone(MediaPlayerEntity):
         This has to accept HA 0..1 levels of volume
         and do the conversion to Nuvo volume format.
         """
-        # _LOGGER.debug(f"Current vol hass: {self._volume} nuvo: {self._hass_to_nuvo_vol(self._volume)}")
-        # _LOGGER.debug(f"Requested vol hass: {volume} nuvo: {self._hass_to_nuvo_vol(volume)}")
+
         nuvo_volume = self._hass_to_nuvo_vol(volume)
         await self._nuvo.set_volume(self._zone_id, nuvo_volume)
 
@@ -355,3 +387,15 @@ class NuvoZone(MediaPlayerEntity):
         """Service handler to restore zone's saved state."""
         if self._snapshot:
             await self._nuvo.restore_zone(self._snapshot)
+
+    async def simulate_play_pause_button(self) -> None:
+        """Service call to simulate pressing keypad play/pause button."""
+        await self._nuvo.zone_button_play_pause(self._zone_id)
+
+    async def simulate_prev_button(self) -> None:
+        """Service call to simulate pressing keypad prev button."""
+        await self._nuvo.zone_button_prev(self._zone_id)
+
+    async def simulate_next_button(self) -> None:
+        """Service call to simulate pressing keypad next button."""
+        await self._nuvo.zone_button_next(self._zone_id)

@@ -5,7 +5,7 @@ import logging
 from typing import Any
 
 from nuvo_serial import get_nuvo_async
-from nuvo_serial.const import ranges
+from nuvo_serial.configuration import config
 from nuvo_serial.exceptions import ModelMismatchError
 from nuvo_serial.grand_concerto_essentia_g import SourceConfiguration, ZoneConfiguration
 from serial import SerialException
@@ -26,7 +26,7 @@ from .const import CONF_SOURCES, CONF_ZONES, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-models = {" ".join(model.split("_")): model for model in ranges.keys()}
+models = {" ".join(model.split("_")): model for model in config.keys()}
 DATA_SCHEMA = vol.Schema(
     {vol.Required(CONF_PORT): str, vol.Required(CONF_TYPE): vol.In(models.keys())}
 )
@@ -221,7 +221,7 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _get_nuvo_sources(self) -> list[SourceConfiguration]:
         """Retrieve enabled sources from Nuvo."""
-        source_count = ranges[self._data[CONF_TYPE]]["sources"]
+        source_count = config[self._data[CONF_TYPE]]["sources"]["total"]
         sources = []
         for source_num in range(1, source_count + 1):
             source = await self._nuvo.source_status(source_num)
@@ -232,7 +232,7 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _get_nuvo_zones(self) -> list[ZoneConfiguration]:
         """Retrieve enabled zones from Nuvo."""
-        zone_count = ranges[self._data[CONF_TYPE]]["zones"]["physical"]
+        zone_count = config[self._data[CONF_TYPE]]["zones"]["physical"]
         zones = []
         for zone_num in range(1, zone_count + 1):
             zone = await self._nuvo.zone_configuration(zone_num)

@@ -4,7 +4,8 @@ from __future__ import annotations
 import logging
 from typing import Callable, Iterable
 
-from nuvo_serial.const import SOURCE_CONFIGURATION, ZONE_EQ_STATUS, ranges
+from nuvo_serial.configuration import config
+from nuvo_serial.const import SOURCE_CONFIGURATION, ZONE_EQ_STATUS
 
 from homeassistant.components.number import NumberEntity
 from homeassistant.config_entries import ConfigEntry
@@ -104,17 +105,17 @@ class NuvoNumberControl(NumberEntity):
     @property
     def min_value(self) -> float:
         """Return the minimum value."""
-        return float(ranges[self._model][self._control_name]["min"])
+        return float(config[self._model][self._control_name]["min"])
 
     @property
     def max_value(self) -> float:
         """Return the maximum value."""
-        return float(ranges[self._model][self._control_name]["max"])
+        return float(config[self._model][self._control_name]["max"])
 
     @property
     def step(self) -> float:
         """Return the increment/decrement step."""
-        return float(ranges[self._model][self._control_name]["step"])
+        return float(config[self._model][self._control_name]["step"])
 
     @property
     def value(self) -> float:
@@ -169,7 +170,7 @@ class Balance(EQ):
     @property
     def min_value(self) -> float:
         """Return the minimum value."""
-        max = float(ranges[self._model][CONTROL_EQ_BALANCE]["max"])
+        max = float(config[self._model][CONTROL_EQ_BALANCE]["max"])
         return -max
 
     async def _nuvo_set_control_value(self, value: float) -> None:
