@@ -15,6 +15,8 @@ from .const import (
     DOMAIN,
     FIRST_RUN,
     NUVO_OBJECT,
+    SERVICE_PAGE_OFF,
+    SERVICE_PAGE_ON,
     UNDO_UPDATE_LISTENER,
 )
 
@@ -71,6 +73,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             hass.config_entries.async_forward_entry_setup(entry, component)
         )
 
+    async def page_on(call) -> None:
+        """Service call to turn paging on."""
+        await nuvo.set_page(True)
+
+    async def page_off(call) -> None:
+        """Service call to turn paging off."""
+        await nuvo.set_page(False)
+
+    hass.services.async_register(DOMAIN, SERVICE_PAGE_ON, page_on, schema=None)
+
+    hass.services.async_register(DOMAIN, SERVICE_PAGE_OFF, page_off, schema=None)
+
     return True
 
 
@@ -85,7 +99,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
         )
     )
 
+    await hass.data[DOMAIN][entry.entry_id][NUVO_OBJECT].disconnect()
+
     if unload_ok:
+        hass.data[DOMAIN][entry.entry_id][NUVO_OBJECT] = None
         hass.data[DOMAIN][entry.entry_id][UNDO_UPDATE_LISTENER]()
         hass.data[DOMAIN].pop(entry.entry_id)
 

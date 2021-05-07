@@ -3,6 +3,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 import logging
 
 from nuvo_serial.const import ranges
+import voluptuous as vol
 
 from homeassistant import core
 from homeassistant.components.media_player import MediaPlayerEntity
@@ -14,8 +15,8 @@ from homeassistant.components.media_player.const import (
     SUPPORT_VOLUME_SET,
     SUPPORT_VOLUME_STEP,
 )
-from homeassistant.const import CONF_TYPE, STATE_OFF, STATE_ON
-from homeassistant.helpers import config_validation as cv, entity_platform, service
+from homeassistant.const import ATTR_ENTITY_ID, CONF_TYPE, STATE_OFF, STATE_ON
+from homeassistant.helpers import config_validation as cv, entity_platform
 
 from .const import (
     CONF_SOURCES,
@@ -109,36 +110,12 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     platform = entity_platform.current_platform.get()
 
-    def _call_service(entities, service_call):
-        for entity in entities:
-            if service_call.service == SERVICE_SNAPSHOT:
-                entity.snapshot()
-            elif service_call.service == SERVICE_RESTORE:
-                entity.restore()
+    SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_ids})
 
-    @service.verify_domain_control(hass, DOMAIN)
-    async def async_service_handle(service_call):
-        """Handle for services."""
-        entities = await platform.async_extract_from_service(service_call)
-
-        if not entities:
-            return
-
-        hass.async_add_executor_job(_call_service, entities, service_call)
-
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_SNAPSHOT,
-        async_service_handle,
-        schema=cv.make_entity_service_schema({}),
-    )
-
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_RESTORE,
-        async_service_handle,
-        schema=cv.make_entity_service_schema({}),
-    )
+    # def async_register_entity_service(self, name, schema, func, required_features=None)
+    # This will call Entity.set_sleep_timer(sleep_time=VALUE)
+    platform.async_register_entity_service(SERVICE_SNAPSHOT, SERVICE_SCHEMA, "snapshot")
+    platform.async_register_entity_service(SERVICE_RESTORE, SERVICE_SCHEMA, "restore")
 
 
 class NuvoZone(MediaPlayerEntity):
@@ -193,9 +170,7 @@ class NuvoZone(MediaPlayerEntity):
         """
         self._nuvo.add_subscriber(self._update_callback, "ZoneStatus")
         self._nuvo.add_subscriber(self._update_callback, "ZoneConfiguration")
-        _LOGGER.debug("ZONE %d: Requesting initial zone status", self._zone_id)
         await self._nuvo.zone_status(self._zone_id)
-        _LOGGER.debug("ZONE %d: Requesting initial zone configuration", self._zone_id)
         await self._nuvo.zone_configuration(self._zone_id)
 
     async def async_will_remove_from_hass(self) -> None:
@@ -205,6 +180,7 @@ class NuvoZone(MediaPlayerEntity):
         """
         self._nuvo.remove_subscriber(self._update_callback, "ZoneStatus")
         self._nuvo.remove_subscriber(self._update_callback, "ZoneConfiguration")
+        self._nuvo = None
 
     async def _update_callback(self, message):
         """Update entity state callback.
@@ -354,16 +330,6 @@ class NuvoZone(MediaPlayerEntity):
         """List of available input sources."""
         return self._source_names
 
-    def snapshot(self):
-        """Save zone's current state."""
-        self._snapshot = self._nuvo.zone_status(self._zone_id)
-
-    def restore(self):
-        """Restore saved state."""
-        if self._snapshot:
-            self._nuvo.restore_zone(self._snapshot)
-            self.schedule_update_ha_state(True)
-
     async def async_select_source(self, source):
         """Set input source."""
         if source not in self._source_name_id:
@@ -438,10 +404,11 @@ class NuvoZone(MediaPlayerEntity):
             )
         )
 
-    def page_on(self):
-        """Turn Page On."""
-        self._nuvo.set_page_on()
+    async def snapshot(self):
+        """Service handler to save zone's current state."""
+        self._snapshot = await self._nuvo.zone_status(self._zone_id)
 
-    def page_off(self):
-        """Turn Page Off."""
-        self._nuvo.set_page_off()
+    async def restore(self):
+        """Service handler to restore zone's saved state."""
+        if self._snapshot:
+            await self._nuvo.restore_zone(self._snapshot)

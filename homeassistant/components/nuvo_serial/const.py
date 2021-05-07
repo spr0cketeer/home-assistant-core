@@ -18,6 +18,8 @@ CONF_NOT_FIRST_RUN = "not_first_run"
 
 SERVICE_SNAPSHOT = "snapshot"
 SERVICE_RESTORE = "restore"
+SERVICE_PAGE_ON = "page_on"
+SERVICE_PAGE_OFF = "page_off"
 
 FIRST_RUN = "first_run"
 NUVO_OBJECT = "nuvo_object"
