@@ -3,7 +3,6 @@ import asyncio
 import logging
 
 from nuvo_serial import get_nuvo_async
-from serial import SerialException
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PORT, CONF_TYPE
@@ -36,7 +35,7 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
 
     try:
         nuvo = await get_nuvo_async(port, model)
-    except SerialException as err:
+    except Exception as err:
         _LOGGER.error("Error connecting to Nuvo controller at %s", port)
         raise ConfigEntryNotReady from err
 
