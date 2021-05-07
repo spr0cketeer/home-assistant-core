@@ -60,7 +60,7 @@ class NuvoControl:
         return self._name
 
     @property
-    def device_state_attributes(self) -> dict[str, int]:
+    def extra_state_attributes(self) -> dict[str, int]:
         """Return the name of the control."""
         return {f"{self._nuvo_entity_type}_id": self._nuvo_id}
 

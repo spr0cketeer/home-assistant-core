@@ -162,7 +162,7 @@ class NuvoZone(MediaPlayerEntity):
         return self._name
 
     @property
-    def device_state_attributes(self) -> dict[str, int]:
+    def extra_state_attributes(self) -> dict[str, int]:
         """Return the name of the control."""
         return {"zone_id": self._zone_id}
 
