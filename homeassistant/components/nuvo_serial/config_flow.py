@@ -122,6 +122,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _create_entry(self):
         """Create device and entities."""
+        await self._nuvo.disconnect()
+        self._nuvo = None
         title = " ".join(self._data[CONF_TYPE].split("_"))
         return self.async_create_entry(title=title, data=self._data)
 
