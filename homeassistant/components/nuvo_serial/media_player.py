@@ -2,6 +2,8 @@
 from decimal import ROUND_HALF_EVEN, Decimal
 import logging
 
+from nuvo_serial.const import ranges
+
 from homeassistant import core
 from homeassistant.components.media_player import MediaPlayerEntity
 from homeassistant.components.media_player.const import (
@@ -17,6 +19,7 @@ from homeassistant.helpers import config_validation as cv, entity_platform, serv
 
 from .const import (
     CONF_SOURCES,
+    CONF_VOLUME_STEP,
     CONF_ZONES,
     DOMAIN,
     FIRST_RUN,
@@ -40,14 +43,6 @@ SUPPORT_NUVO_SERIAL = (
     | SUPPORT_TURN_OFF
     | SUPPORT_SELECT_SOURCE
 )
-
-LEVELS = {
-    "Grand_Concerto": {
-        "volume": {"max": 0, "min": 79, "step": 1},
-        "bass": {"max": 18, "min": -18, "step": 2},
-        "treble": {"max": 18, "min": -18, "step": 2},
-    }
-}
 
 
 @core.callback
@@ -90,7 +85,9 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     sources = _get_sources(config_entry)
     zones = _get_zones(config_entry)
-    volume_step = 1
+    volume_step = config_entry.data.get(CONF_VOLUME_STEP, 1)
+    max_volume = ranges[model]["volume"]["max"]
+    min_volume = ranges[model]["volume"]["min"]
     entities = []
 
     for zone_id, zone_name in zones.items():
@@ -104,6 +101,8 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 zone_id,
                 zone_name,
                 volume_step,
+                max_volume,
+                min_volume,
             )
         )
 
@@ -149,7 +148,16 @@ class NuvoZone(MediaPlayerEntity):
     """Representation of a Nuvo amplifier zone."""
 
     def __init__(
-        self, nuvo, model, sources, namespace, zone_id, zone_name, volume_step
+        self,
+        nuvo,
+        model,
+        sources,
+        namespace,
+        zone_id,
+        zone_name,
+        volume_step,
+        max_volume,
+        min_volume,
     ):
         """Initialize new zone."""
         self._nuvo = nuvo
@@ -166,6 +174,8 @@ class NuvoZone(MediaPlayerEntity):
         self._namespace = namespace
         self._unique_id = f"{self._namespace}_zone_{self._zone_id}_zone"
         self._volume_step = volume_step
+        self._max_volume = max_volume
+        self._min_volume = min_volume
 
         self._snapshot = None
         self._state = None
@@ -311,7 +321,10 @@ class NuvoZone(MediaPlayerEntity):
             return
         self._nuvo.set_volume(
             self._zone_id,
-            max(self.hass_to_nuvo_vol(self._volume) - self._volume_step, 0),
+            max(
+                self.hass_to_nuvo_vol(self._volume) - self._volume_step,
+                self._max_volume,
+            ),
         )
         # self._nuvo.set_volume(self._zone_id, max(self.hass_to_nuvo_vol(self._volume) - 1, 0))
 
@@ -321,48 +334,24 @@ class NuvoZone(MediaPlayerEntity):
             return
         self._nuvo.set_volume(
             self._zone_id,
-            min(self.hass_to_nuvo_vol(self._volume) + self._volume_step, 79),
+            min(
+                self.hass_to_nuvo_vol(self._volume) + self._volume_step,
+                self._min_volume,
+            ),
         )
         # self._nuvo.set_volume(self._zone_id, min(self.hass_to_nuvo_vol(self._volume) + 1, 79))
 
     def nuvo_to_hass_vol(self, volume):
         """Convert from nuvo to hass volume."""
-        return 1 - (volume / 79)
+        return 1 - (volume / self._min_volume)
 
     def hass_to_nuvo_vol(self, volume):
         """Convert from hass to nuvo volume."""
         return int(
-            Decimal(79 - (volume * 79)).to_integral_exact(rounding=ROUND_HALF_EVEN)
-        )
-
-    def nuvo_to_hass_eq(self, eq_type, eq_value):
-        """Convert from nvuo to hass eq."""
-        nuvo_max = LEVELS[self._model][eq_type]["max"]
-        nuvo_min = LEVELS[self._model][eq_type]["min"]
-        # hass_eq = ( (eq_value - nuvo_min) / (nuvo_max - nuvo_min) * (HASS_MAX - HASS_MIN) + HASS_MIN )
-        hass_eq = (eq_value - nuvo_min) / (nuvo_max - nuvo_min)
-        # _LOGGER.debug(f"Nuvo {eq_type} {eq_value} converted to hass {eq_type} {hass_eq}")
-        return hass_eq
-
-    def hass_to_nuvo_eq(self, eq_type, eq_value):
-        """Convert from hass to nuvo eq."""
-        nuvo_max = (
-            LEVELS[self._model][eq_type]["max"] / LEVELS[self._model][eq_type]["step"]
-        )
-        nuvo_min = (
-            LEVELS[self._model][eq_type]["min"] / LEVELS[self._model][eq_type]["step"]
-        )
-        # nuvo_eq = Decimal(( (eq_value - HASS_MIN) / (HASS_MAX - HASS_MIN) * (nuvo_max - nuvo_min) + nuvo_min )).to_integral_exact(rounding=ROUND_HALF_EVEN) * 2
-        nuvo_eq = (
-            int(
-                Decimal(
-                    (eq_value * (nuvo_max - nuvo_min)) + nuvo_min
-                ).to_integral_exact(rounding=ROUND_HALF_EVEN)
+            Decimal(self._min_volume - (volume * self._min_volume)).to_integral_exact(
+                rounding=ROUND_HALF_EVEN
             )
-            * 2
         )
-        # _LOGGER.debug(f"Hass {eq_type} {eq_value} converted to nuvo {eq_type} {nuvo_eq}")
-        return nuvo_eq
 
     def page_on(self):
         """Turn Page On."""
