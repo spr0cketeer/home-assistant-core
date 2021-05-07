@@ -1,11 +1,11 @@
 """Support for interfacing with Nuvo multi-zone amplifier."""
 from decimal import ROUND_HALF_EVEN, Decimal
 import logging
+from typing import Dict
 
 from nuvo_serial.const import ranges
 import voluptuous as vol
 
-from homeassistant import core
 from homeassistant.components.media_player import MediaPlayerEntity
 from homeassistant.components.media_player.const import (
     SUPPORT_SELECT_SOURCE,
@@ -19,15 +19,16 @@ from homeassistant.const import ATTR_ENTITY_ID, CONF_TYPE, STATE_OFF, STATE_ON
 from homeassistant.helpers import config_validation as cv, entity_platform
 
 from .const import (
-    CONF_SOURCES,
     CONF_VOLUME_STEP,
-    CONF_ZONES,
     DOMAIN,
-    FIRST_RUN,
     NUVO_OBJECT,
     SERVICE_RESTORE,
     SERVICE_SNAPSHOT,
 )
+from .helpers import get_sources, get_zones
+
+# from typing import Any, Callable, Dict, Iterable, List
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,46 +44,14 @@ SUPPORT_NUVO_SERIAL = (
 )
 
 
-@core.callback
-def _get_sources_from_dict(data):
-    sources_config = data[CONF_SOURCES]
-
-    source_id_name = {int(index): name for index, name in sources_config.items()}
-
-    source_name_id = {v: k for k, v in source_id_name.items()}
-
-    source_names = sorted(source_name_id.keys(), key=lambda v: source_name_id[v])
-
-    return [source_id_name, source_name_id, source_names]
-
-
-@core.callback
-def _get_sources(config_entry):
-    if CONF_SOURCES in config_entry.options:
-        data = config_entry.options
-    else:
-        data = config_entry.data
-    return _get_sources_from_dict(data)
-
-
-@core.callback
-def _get_zones(config_entry):
-    if CONF_ZONES in config_entry.options:
-        data = config_entry.options
-    else:
-        data = config_entry.data
-
-    return data[CONF_ZONES]
-
-
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Nuvo multi-zone amplifier platform."""
     model = config_entry.data[CONF_TYPE]
 
     nuvo = hass.data[DOMAIN][config_entry.entry_id][NUVO_OBJECT]
 
-    sources = _get_sources(config_entry)
-    zones = _get_zones(config_entry)
+    sources = get_sources(config_entry)
+    zones = get_zones(config_entry)
     volume_step = config_entry.data.get(CONF_VOLUME_STEP, 1)
     max_volume = ranges[model]["volume"]["max"]
     min_volume = ranges[model]["volume"]["min"]
@@ -104,16 +73,12 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             )
         )
 
-    # only call update before add if it's the first run so we can try to detect zones
-    first_run = hass.data[DOMAIN][config_entry.entry_id][FIRST_RUN]
-    async_add_entities(entities, first_run)
+    async_add_entities(entities, False)
 
     platform = entity_platform.current_platform.get()
 
     SERVICE_SCHEMA = vol.Schema({vol.Optional(ATTR_ENTITY_ID): cv.entity_ids})
 
-    # def async_register_entity_service(self, name, schema, func, required_features=None)
-    # This will call Entity.set_sleep_timer(sleep_time=VALUE)
     platform.async_register_entity_service(SERVICE_SNAPSHOT, SERVICE_SCHEMA, "snapshot")
     platform.async_register_entity_service(SERVICE_RESTORE, SERVICE_SCHEMA, "restore")
 
@@ -205,47 +170,12 @@ class NuvoZone(MediaPlayerEntity):
             return
 
         self.async_schedule_update_ha_state()
-        # self.async_write_ha_state()
-
-    # def update(self):
-    #     """Retrieve latest state."""
-
-    #     try:
-    #         z_status = self._nuvo.zone_status(self._zone_id)
-    #         z_cfg = self._nuvo.zone_configuration(self._zone_id)
-    #     except (SerialException, ValueError) as e:
-    #         _LOGGER.error(
-    #             "Zone %d %s Update failed: %s",
-    #             self._zone_id,
-    #             self.entity_id,
-    #             e,
-    #         )
-    #         return
-
-    #     self._process_zone_status(z_status)
-
-    #     self._source = self._source_id_name.get(z_status.source, None)
-
-    #     """
-    #     Update zone's permitted sources.
-    #     A permitted source may not appear in the list of system-wide enabled sources.
-    #     """
-    #     self._source_names = list(
-    #         filter(
-    #             None,
-    #             [
-    #                 self._source_id_name.get(id, None)
-    #                 for id in [int(src.split("SOURCE")[1]) for src in z_cfg.sources]
-    #             ],
-    #         )
-    #     )
 
     def _process_zone_status(self, z_status):
         """Update zone's power, volume and source state.
 
         A permitted source may not appear in the list of system-wide enabled sources.
         """
-        # _LOGGER.debug("Processing zone status %s", z_status)
         if not z_status.power:
             self._state = STATE_OFF
             return True
@@ -264,7 +194,6 @@ class NuvoZone(MediaPlayerEntity):
         A permitted source may not appear in the list of system-wide enabled sources so
         need to filter these out.
         """
-        # _LOGGER.debug("Processing zone configuration %s", z_cfg)
         self._source_names = list(
             filter(
                 None,
@@ -294,6 +223,11 @@ class NuvoZone(MediaPlayerEntity):
     def name(self):
         """Return the name of the zone."""
         return self._name
+
+    @property
+    def device_state_attributes(self) -> Dict[str, int]:
+        """Return the name of the control."""
+        return {"zone_id": self._zone_id}
 
     @property
     def state(self):

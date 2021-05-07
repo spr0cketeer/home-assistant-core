@@ -20,8 +20,7 @@ from .const import (
     UNDO_UPDATE_LISTENER,
 )
 
-PLATFORMS = ["media_player"]
-# PLATFORMS = ["media_player", "number", "switch"]
+PLATFORMS = ["media_player", "number", "switch"]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,18 +38,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     try:
         nuvo = await get_nuvo_async(port, model)
-        # nuvo = await hass.async_add_executor_job(get_nuvo, port, model)
     except SerialException as err:
         _LOGGER.error("Error connecting to Nuvo controller at %s", port)
         raise ConfigEntryNotReady from err
-
-    # hass.async_create_task(
-    #     hass.config_entries.flow.async_init(
-    #         DOMAIN,
-    #         context={"source": SOURCE_REAUTH},
-    #         data=entry.data,
-    #     )
-    # )
 
     # double negative to handle absence of value
     first_run = not bool(entry.data.get(CONF_NOT_FIRST_RUN))
