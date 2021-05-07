@@ -169,7 +169,7 @@ class NuvoZone(MediaPlayerEntity):
         self._zone_id = zone_id
         self._name = zone_name
         self._namespace = namespace
-        self._unique_id = f"{self._namespace}_{self._zone_id}"
+        self._unique_id = f"{self._namespace}_zone_{self._zone_id}_zone"
         self._volume_step = volume_step
 
         self._snapshot = None

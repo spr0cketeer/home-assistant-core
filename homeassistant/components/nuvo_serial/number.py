@@ -57,7 +57,7 @@ class Bass(NumberEntity):
         self._zone_name = zone_name
         self._name = f"{self._zone_name} Bass"
         self._namespace = namespace
-        self._unique_id = f"{self._namespace}_zone{self._zone_id}_bass"
+        self._unique_id = f"{self._namespace}_zone_{self._zone_id}_bass"
         self._bass = None
 
     @property
@@ -127,7 +127,7 @@ class Treble(NumberEntity):
         self._zone_name = zone_name
         self._name = f"{self._zone_name} Treble"
         self._namespace = namespace
-        self._unique_id = f"{self._namespace}_zone{self._zone_id}_treble"
+        self._unique_id = f"{self._namespace}_zone_{self._zone_id}_treble"
         self._treble = None
 
     @property
@@ -197,7 +197,7 @@ class Balance(NumberEntity):
         self._zone_name = zone_name
         self._name = f"{self._zone_name} Balance"
         self._namespace = namespace
-        self._unique_id = f"{self._namespace}_zone{self._zone_id}_balance"
+        self._unique_id = f"{self._namespace}_zone_{self._zone_id}_balance"
         self._balance = None
 
     @property
