@@ -38,6 +38,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     for zone_id, zone_name in zones.items():
         zone_id = int(zone_id)
         entities.append(Bass(nuvo, model, config_entry.entry_id, zone_id, zone_name))
+        entities.append(Treble(nuvo, model, config_entry.entry_id, zone_id, zone_name))
 
     # only call update before add if it's the first run so we can try to detect zones
     first_run = hass.data[DOMAIN][config_entry.entry_id][FIRST_RUN]
@@ -55,7 +56,7 @@ class Bass(NumberEntity):
         self._zone_name = zone_name
         self._name = f"{self._zone_name} Bass"
         self._namespace = namespace
-        self._unique_id = f"{self._namespace}_{self._zone_id}_bass"
+        self._unique_id = f"{self._namespace}_zone{self._zone_id}_bass"
         self._bass = None
 
     @property
@@ -91,6 +92,76 @@ class Bass(NumberEntity):
             return False
 
         self._bass = float(eq.bass)
+        return True
+
+    @property
+    def device_info(self):
+        """Return device info for this device."""
+        return {
+            "identifiers": {(DOMAIN, self._namespace)},
+            "name": f"{' '.join(self._model.split('_'))}",
+            "manufacturer": "Nuvo",
+            "model": self._model,
+        }
+
+    @property
+    def unique_id(self):
+        """Return unique ID for this device."""
+        return self._unique_id
+
+    @property
+    def name(self):
+        """Return the name of the bass number."""
+        return self._name
+
+
+class Treble(NumberEntity):
+    """Treble control for Nuvo amplifier zone."""
+
+    def __init__(self, nuvo, model, namespace, zone_id, zone_name):
+        """Init this entity."""
+        self._nuvo = nuvo
+        self._model = model
+        self._zone_id = zone_id
+        self._zone_name = zone_name
+        self._name = f"{self._zone_name} Treble"
+        self._namespace = namespace
+        self._unique_id = f"{self._namespace}_zone{self._zone_id}_treble"
+        self._treble = None
+
+    @property
+    def min_value(self) -> float:
+        """Return the minimum value."""
+        return ranges[self._model]["treble"]["min"]
+
+    @property
+    def max_value(self) -> float:
+        """Return the maximum value."""
+        return ranges[self._model]["treble"]["max"]
+
+    @property
+    def step(self) -> float:
+        """Return the increment/decrement step."""
+        return ranges[self._model]["treble"]["step"]
+
+    @property
+    def value(self) -> float:
+        """Return the entity value to represent the entity state."""
+        return self._treble
+
+    def set_value(self, value: float) -> None:
+        """Set new value."""
+        self._nuvo.set_treble(self._zone_id, int(value))
+
+    def update(self):
+        """Retrieve latest state."""
+
+        eq = self._nuvo.zone_eq_status(self._zone_id)
+        if not eq:
+            _LOGGER.error("NO EQ STATE RETURNED")
+            return False
+
+        self._treble = float(eq.treble)
         return True
 
     @property
