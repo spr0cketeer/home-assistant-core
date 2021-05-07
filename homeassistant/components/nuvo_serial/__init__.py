@@ -11,9 +11,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.typing import ConfigType, HomeAssistantType, ServiceCallType
 
 from .const import (
-    CONF_NOT_FIRST_RUN,
     DOMAIN,
-    FIRST_RUN,
     NUVO_OBJECT,
     SERVICE_PAGE_OFF,
     SERVICE_PAGE_ON,
@@ -32,7 +30,7 @@ async def async_setup(hass: HomeAssistantType, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool:
     """Set up Nuvo multi-zone amplifier from a config entry."""
-    # port = entry.data[CONF_PORT]
+
     port = entry.options.get(CONF_PORT, entry.data[CONF_PORT])
     model = entry.data[CONF_TYPE]
 
@@ -42,20 +40,11 @@ async def async_setup_entry(hass: HomeAssistantType, entry: ConfigEntry) -> bool
         _LOGGER.error("Error connecting to Nuvo controller at %s", port)
         raise ConfigEntryNotReady from err
 
-    # double negative to handle absence of value
-    first_run = not bool(entry.data.get(CONF_NOT_FIRST_RUN))
-
-    if first_run:
-        hass.config_entries.async_update_entry(
-            entry, data={**entry.data, CONF_NOT_FIRST_RUN: True}
-        )
-
     undo_listener = entry.add_update_listener(_update_listener)
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         NUVO_OBJECT: nuvo,
         UNDO_UPDATE_LISTENER: undo_listener,
-        FIRST_RUN: first_run,
     }
 
     for component in PLATFORMS:
@@ -89,6 +78,7 @@ async def async_unload_entry(hass: HomeAssistantType, entry: ConfigEntry) -> boo
         )
     )
 
+    # Disconnect and free the serial port
     await hass.data[DOMAIN][entry.entry_id][NUVO_OBJECT].disconnect()
 
     if unload_ok:
@@ -101,4 +91,5 @@ async def async_unload_entry(hass: HomeAssistantType, entry: ConfigEntry) -> boo
 
 async def _update_listener(hass: HomeAssistantType, entry: ConfigEntry) -> None:
     """Handle options update."""
+
     await hass.config_entries.async_reload(entry.entry_id)
