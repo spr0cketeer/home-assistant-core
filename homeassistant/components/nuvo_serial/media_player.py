@@ -143,7 +143,7 @@ class NuvoZone(MediaPlayerEntity):
 
         self._snapshot = None
         self._state: str = ""
-        self._volume: float
+        self._volume: float | None
         self._source: str
         self._mute: bool
 
@@ -285,7 +285,9 @@ class NuvoZone(MediaPlayerEntity):
         self._state = STATE_ON
         self._mute = z_status.mute
 
-        if not self._mute:
+        if self._mute:
+            self._volume = None
+        else:
             self._volume = self._nuvo_to_hass_vol(z_status.volume)
 
         self._source = self._source_id_name.get(z_status.source, None)
