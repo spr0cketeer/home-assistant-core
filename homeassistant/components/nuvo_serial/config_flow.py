@@ -12,7 +12,7 @@ from serial import SerialException
 import voluptuous as vol
 
 from homeassistant.config_entries import (
-    CONN_CLASS_LOCAL_POLL,
+    CONN_CLASS_LOCAL_PUSH,
     ConfigEntry,
     ConfigFlow,
     OptionsFlow,
@@ -87,7 +87,7 @@ class NuvoConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Nuvo Amplifier."""
 
     VERSION = 1
-    CONNECTION_CLASS = CONN_CLASS_LOCAL_POLL
+    CONNECTION_CLASS = CONN_CLASS_LOCAL_PUSH
 
     @staticmethod
     @callback
